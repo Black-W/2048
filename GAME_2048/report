@@ -1,0 +1,229 @@
+游戏2048设计实验报告
+一、实验题目：游戏2048设计
+二、实验设计要求： 
+1、使用C语言编写2048游戏 
+2、能够正常运行，判断胜负，并拥有游戏界面
+3、能统计得分，并重复运行
+4、能使用键盘操作游戏
+三、设计思路： 
+1、游戏介绍： 
+2048是一款简单的数字类游戏，界面是一个4*4的方形格子。每个格子里可以为空或者有一个2^n的数值。 
+开始时棋盘内随机出现两个数字，出现的数字仅可能为2或4，玩家可以选择上下左右四个方向，若棋盘内的数字出现位移或合并，视为有效移动。每次有效移动后，棋盘的空格处(无数字处)随机出现一个数字(依然可能为2或4，出现2的概率是4的两倍)。
+玩家选择的方向上若有相邻的（中间可以有空格）相同的数字则合并，每次有效移动可以同时合并，但不可以连续合并。合并所得的所有新生成数字相加即为该步的有效得分。
+若棋盘被数字填满，且任意方形皆无法合并，判负，游戏结束。若棋盘上出现2048，判胜，游戏结束。
+2、总体设计： 
+i. 可以使用二维数组来保存4*4格子中的数值
+ii. 操作，通过getch()函数，读取用户在键盘上的方向键，进行判断执行对应的代码。 
+iii. 游戏界面，可以使用简单的特殊制表符来实现，并通过清屏函数system(“cls”)来进行反复同位置打印界面。 
+iv. 需要判断游戏结束、进行数字合并与移动的函数，以及记录游戏分数的变量
+v. 当游戏结束时，能够询问用户是否重新开始。
+vi. 随机生成一个新数，可以调用随机函数，使用时间做种子。
+四、关键变量说明
+    int board[SIZE][SIZE];  用来存储4*4棋盘的二维数组
+int need_add_random=0;  每次有效移动后，将该变量赋值为1，表示有效移动后需要向棋盘中添加一个新的随机数2或4
+int game_ended=0;  游戏结束标记，在判负后将变量赋值为1，表示游戏结束
+int game_win=0;  游戏结束标记，在判胜后将变量赋值为1，表示游戏结束
+五、各功能模块的具体实现算法
+i.函数main( )主要包含一个while循环，只有当用户胜利或者失败后输入n/N通过exit(0)才能退出程序。以此实现了重复进行游戏的功能，外层每循环一次就是一次新的游戏。
+int main() {
+	while(1) {				//循环一次就是一次新的游戏
+		initial_game();		//初始化棋盘函数
+		start_game();			//游戏运行函数
+		if(game_ended) { 	//判负
+			printf("                       GAME OVER.   PLAY AGAIN? (Y/N)");
+			int ch;
+			while(ch=getch()) {
+				if(ch=='y'||ch=='Y')break;		//继续游戏
+				if(ch=='n'||ch=='N')exit(0);		//退出游戏
+			}
+		} else if(game_win) {		//判胜
+			printf("                        YOU WIN.   PLAY AGAIN? (Y/N)");
+			int ch;
+			while(ch=getch()) {
+				if(ch=='y'||ch=='Y')break;
+				if(ch=='n'||ch=='N')exit(0);
+			}
+		}
+	}
+	return 0;
+}
+ii. 函数void initial_game();	用于初始化棋盘
+void initial_game() {
+	game_win=0
+	game_ended=0;				//初始化结束标记
+	score=0;					//初始化得分
+	int x,y;
+	for(x=0; x<SIZE; x++) {
+		for(y=0; y<SIZE; y++)board[x][y]=0;	//初始化棋盘
+	}
+	add_random();
+	add_random();				//添加初始的两个随机数
+	print_board();				//初始化后打印出棋盘
+}
+iii. 函数void add_random();用于向棋盘中添加一个随机数2或4且2的概率是4的两倍，随机种子是时间time()。随机数的位置取遍历棋盘数组得到的第n个非零（空）元素，其中n用rand()%count+1生成，count代表棋盘中空元素的总个数，count的大小是count_empty（）函数的返回值
+
+void add_random() {		
+	int n,count,x,y,temp,num;
+	if((count=count_empty())==0)return;
+	srand(time(0));			//设置随机数种子
+	temp=rand()%3;			//取随机数0，1，2
+	if(temp==2)num=4;		
+	else num=2;				//若随机数是2，则添加的数是4，若随机数是0或者1，则添加的数是2，这样就保证了2的概率是4的两倍
+	n=(rand()%count)+1;		//确定新加元素是数组遍历到的第几个空元素
+	for(x=0; x<SIZE; x++)
+		for(y=0; y<SIZE; y++) {
+			if(board[x][y]==0&&--n==0) {		//第n个空元素
+				board[x][y]=num;
+				return;
+			}
+		}
+}
+iv.函数void start_game();用于开始一局游戏，函数主体是一个while循环，只有当游戏结束标记为1时，即游戏失败或者胜利时，才退出循环，返回main函数进行选择是否继续游戏。读取方向键用getch（）函数，可以不用回车立即回显，可以读取四个方向键，也可以读取大小写的w,,s,a,d代表方向。各个方向都有一个函数来移动合并数字，并根据有无有效移动来修改need_add_random标志。移动结束后通过need_add_random标志决定是否添加新元素2，4，通过check_game_ended()函数和check_game_win()函数来判断游戏胜负，并修改结束标志。
+
+void start_game() {
+	int ch;
+	while(!game_ended&&!game_win) {
+		need_add_random=0;		//移动前将添加标志置为0
+		ch=getch();
+		switch(ch) {
+			case'w':
+			case'W':
+			case 72:
+				move_up();
+				break;
+			case's':
+			case'S':
+			case 80:
+				move_down();
+				break;
+			case'a':
+			case'A':
+			case 75:
+				move_left();
+				break;
+			case'd':
+			case'D':
+			case 77:
+				move_right();
+				break;
+			case'q':
+			case'Q':
+				printf("Thanks for using.Bye.");
+				exit(0);
+				break;
+			default:
+				;
+		}
+		if(need_add_random) {	//添加标志为1，添加随机数
+			add_random();
+			print_board();
+		}
+		check_game_ended();		//检查游戏是否失败，若失败将game_ended标志置为1
+		check_game_win();		//检查游戏是否胜利，若胜利将game_win标志置为1
+	}
+}
+v.函数void move_up();用来向上移动和合并棋盘中的数字，首先通过一次遍历合并符合要求的数字，再通过一次遍历将合并后的数字向上移动。具体实现方法参考程序注释。
+
+void move_up() { 
+	int x,y,p;				//x=数组行数，y=数组列数，p=自上到下扫描y所在列数的“指针”
+	for(y=0; y<SIZE; y++)	//自上到下合并相同的元素
+		for(x=0; x<SIZE; x++) {
+			if(board[x][y]==0);
+			else {			
+	//找到每一列第一个非零的元素board[x][y]
+				for(p=x+1; p<SIZE; p++) {
+					if(board[p][y]==0);
+					else if(board[p][y]==board[x][y]) {	
+	//找到该列离第一个非零元素最近的非零元素board[p][y]
+						board[x][y]*=2;		
+	//合并到第一个非零元素
+						board[p][y]=0;		
+	//另一个元素置为0
+						score+=board[x][y];
+	//每合并一次元素，更新得分
+						x=p;				
+	//从p的位置开始，继续向下寻找另一个“第一个非零元素”，重复上述过程
+						need_add_random=1;  
+	//每次有效移动后都需要添加新元素
+						break;
+					} else break;			
+	//第一对非零元素不相同则不合并
+				}
+			}
+		}
+	for(y=0; y<SIZE; y++)    		//向上移动合并后的元素
+		for(x=0; x<SIZE; x++) {
+			if(board[x][y]==0);
+			else {					
+				for(p=x; p>0&&board[p-1][y]==0; p--) {
+					board[p-1][y]=board[p][y];
+					board[p][y]=0;
+	//找到非零元素，若该元素上面有空格，则一直上移到没有宫格的位置
+					need_add_random=1;  
+	//每次有效移动后，都需要添加新元素，这里也要修改一次，应对出现只移动不合成的情况
+				}
+			}
+		}
+}
+vi.向其他方向移动的函数可以将棋盘旋转到到与向上移动相同的方向，然后调用move_up();然后再旋转回原本的方向。以move_down()函数为例，先顺时针旋转90度两次，然后调用move_up();然后再顺时针旋转90度两次。
+
+void move_down() {				 
+	rotate_board();
+	rotate_board();
+	move_up(); 
+	rotate_board();
+	rotate_board();
+}
+vii.函数void rotate_board();用于将棋盘顺时针旋转90度，先遍历棋盘，用另一个临时4*4二维数组储存旋转后的棋盘，然后再通过临时棋盘给board赋值
+
+void rotate_board(){	 
+	int board2[SIZE][SIZE];
+	int x,y;
+	for(x=0;x<SIZE;x++){		//用board2存储旋转后的结果 
+		for(y=0;y<SIZE;y++){
+			board2[y][SIZE-1-x]=board[x][y]; 
+		}
+	}
+	for(x=0;x<SIZE;x++){		//将结果放回board 
+		for(y=0;y<SIZE;y++){
+			board[x][y]=board2[x][y];
+		}
+	}
+}
+viii.函数void check_game_ended();和void check_game_win();实现方法如下
+
+void check_game_ended() {	
+	int x,y;
+	if(count_empty())return;	//如果棋盘没有满，必定未结束
+	for(x=0; x<SIZE; x++) {	
+		for(y=0; y<SIZE-1; y++) {
+	//横向纵向比较有无相邻相等的元素
+	if(board[x][y]==board[x][y+1]||board[y][x]==board[y+1][x]) {
+				game_ended=0;	//有相邻相等元素，则未结束
+				return;
+			}
+		}
+	game_ended=1;			//若没有则游戏结束
+	}
+}
+void check_game_win() {	
+	int x,y;
+	for(x=0; x<SIZE; x++) {	//遍历数组，出现2048则获胜
+		for(y=0; y<SIZE-1; y++) {
+			if(board[x][y]==WINSCORE) {
+				game_win=1;
+				return;
+			}
+		}
+	game_win=0;		//若未出现2048则游戏未结束
+	}
+}
+六、程序运行效果截图
+
+
+
+七、总结 
+编写程序的过程中，碰到了诸如不知道如何“清屏”输出（system(“cls”)），如何输入方向后不回车直接输出结果（getch()），如何用方向键输入（72,80,75,77代表上下左右）等问题，都通过百度等方式找到了解决方案，感觉自己又强大了许多。
+此外，在高内举低耦合方面也尽量多使用自定义函数，使用宏，比如在移动上，定义旋转函数rotate_board()，使得只要编写一个方向的移动代码。
+感觉有待改进的就是游戏界面吧和功能不多吧，也想过弄一个图形用户界面，不过还是不会弄，所以在网上学习了别人用win10的符号来刻画界面，不过也只能在cmd里面玩玩。功能上只实现了每次运行记录分数，没有办法本地存储游戏数据，多次运行记录最高成绩等功能。
+总之，感觉收获挺大的，也是自己第一次写的游戏，还是很开心的，希望以后能有所改进，做的更好吧。
